@@ -1,0 +1,103 @@
+{
+  "pages": [
+    {
+      "name": "1 Query flow",
+      "title": "Knowledge-base assistant on Azure: query flow",
+      "width": 1320, "height": 980,
+      "lanes": [
+        {"id": "L_ch", "label": "Users & channels", "x": 20, "y": 50, "w": 190, "h": 750, "style": "ext"},
+        {"id": "L_edge", "label": "Edge (public)", "x": 230, "y": 50, "w": 160, "h": 750, "style": "edge"},
+        {"id": "L_app", "label": "Application tier: App Service (VNet integration)", "x": 410, "y": 50, "w": 330, "h": 560, "style": "vnet"},
+        {"id": "L_gw", "label": "AI gateway", "x": 760, "y": 50, "w": 170, "h": 560, "style": "vnet"},
+        {"id": "L_ai", "label": "AI & search (private endpoints)", "x": 950, "y": 50, "w": 340, "h": 560, "style": "vnet"},
+        {"id": "L_ops", "label": "Identity, secrets & observability", "x": 410, "y": 630, "w": 880, "h": 170, "style": "ops"}
+      ],
+      "nodes": [
+        {"id": "user", "label": "End users\n(web / mobile browser)", "icon": "user", "x": 50, "y": 120},
+        {"id": "teams", "label": "Microsoft Teams", "icon": "teams", "x": 50, "y": 230},
+        {"id": "wa", "label": "WhatsApp\n(ACS / provider)", "icon": "whatsapp", "x": 50, "y": 340},
+        {"id": "fd", "label": "Azure Front Door\n+ WAF", "icon": "front_door", "x": 285, "y": 205},
+        {"id": "web", "label": "Angular / Node.js SPA\nApp Service", "icon": "app_service", "x": 450, "y": 110},
+        {"id": "bot", "label": "Azure Bot Service\n(Teams + WhatsApp)", "icon": "bot_service", "x": 450, "y": 300},
+        {"id": "api", "label": "FastAPI orchestrator\nApp Service", "icon": "app_service", "x": 640, "y": 205},
+        {"id": "apim", "label": "API Management\nAI gateway", "icon": "apim", "x": 810, "y": 205},
+        {"id": "aoai1", "label": "Azure OpenAI\nGPT-5 / GPT-4o (primary)", "icon": "openai", "x": 980, "y": 90},
+        {"id": "aoai2", "label": "Azure OpenAI\nlow-cost fallback model", "icon": "openai", "x": 980, "y": 180},
+        {"id": "redis", "label": "Azure Cache for Redis\nsemantic cache", "icon": "redis", "x": 980, "y": 270},
+        {"id": "safety", "label": "Content Safety\n+ PII detection", "icon": "content_safety", "x": 980, "y": 360},
+        {"id": "search", "label": "Azure AI Search\nhybrid + semantic ranker", "icon": "ai_search", "x": 980, "y": 450},
+        {"id": "emb", "label": "Azure OpenAI\nembeddings", "icon": "openai", "x": 980, "y": 540},
+        {"id": "entra", "label": "Microsoft Entra ID\nSSO + groups", "icon": "entra_id", "x": 470, "y": 660},
+        {"id": "kv", "label": "Key Vault", "icon": "key_vault", "x": 680, "y": 660},
+        {"id": "ai", "label": "Application Insights", "icon": "app_insights", "x": 890, "y": 660},
+        {"id": "la", "label": "Log Analytics", "icon": "log_analytics", "x": 1100, "y": 660}
+      ],
+      "edges": [
+        {"from": "user", "to": "fd", "label": "HTTPS"},
+        {"from": "teams", "to": "fd", "label": "bot traffic"},
+        {"from": "wa", "to": "fd", "label": "webhook"},
+        {"from": "fd", "to": "web", "label": "SPA"},
+        {"from": "fd", "to": "bot", "label": "messages"},
+        {"from": "web", "to": "api", "label": "REST + SSE"},
+        {"from": "bot", "to": "api", "label": "activities"},
+        {"from": "api", "to": "apim", "label": "LLM calls", "exit": [1, 0.5], "entry": [0, 0.5]},
+        {"from": "apim", "to": "aoai1", "label": "primary", "exit": [1, 0.5], "entry": [0, 0.5], "via": [[940, 229], [940, 114]]},
+        {"from": "apim", "to": "aoai2", "label": "fallback", "dashed": true, "color": "#CA5010", "exit": [1, 0.5], "entry": [0, 0.5], "via": [[940, 229], [940, 204]]},
+        {"from": "apim", "to": "redis", "label": "cache", "exit": [1, 0.5], "entry": [0, 0.5], "via": [[940, 229], [940, 294]]},
+        {"from": "apim", "to": "safety", "label": "PII / safety", "exit": [1, 0.5], "entry": [0, 0.5], "via": [[940, 229], [940, 384]]},
+        {"from": "api", "to": "search", "label": "hybrid query + ACL filter", "exit": [1, 0.85], "entry": [0, 0.5], "via": [[715, 246], [715, 474]]},
+        {"from": "search", "to": "emb", "label": "integrated vectorizer", "dashed": true},
+        {"from": "L_app", "to": "L_ops", "label": "OIDC / OBO + group claims  |  managed identity  |  telemetry", "dashed": true}
+      ],
+      "notes": {
+        "x": 20, "y": 820, "w": 1270, "h": 140,
+        "text": "Request flow: (1) user signs in via Entra ID SSO  (2) FastAPI decomposes the question  (3) hybrid search (keyword + vector, top-k) filtered by the user's Entra group IDs  (4) semantic re-ranking  (5) GPT-5 answers and validates groundedness against the top passages  (6) response with citations.\nKey controls: security trimming on every query (OBO flow) | APIM token-per-minute limits, circuit breaker to fallback model, semantic cache | PII + content safety before and after the LLM | private endpoints, managed identity, no keys | golden-question evaluation + tokens per user in App Insights.\nCost note: the validation step adds a second LLM call per request; include it in the token model."
+      }
+    },
+    {
+      "name": "2 Ingestion pipeline",
+      "title": "Knowledge-base assistant on Azure: document ingestion pipeline",
+      "width": 1400, "height": 780,
+      "lanes": [
+        {"id": "M_m365", "label": "Microsoft 365: upload and approval", "x": 20, "y": 50, "w": 380, "h": 360, "style": "m365"},
+        {"id": "M_az", "label": "Ingestion: Azure (VNet, private endpoints)", "x": 430, "y": 50, "w": 640, "h": 360, "style": "vnet"},
+        {"id": "M_idx", "label": "Search index", "x": 1100, "y": 50, "w": 260, "h": 360, "style": "vnet"},
+        {"id": "M_ops", "label": "Security & operations", "x": 430, "y": 430, "w": 930, "h": 170, "style": "ops"}
+      ],
+      "nodes": [
+        {"id": "spo1", "label": "SharePoint library\n(upload / staging)", "icon": "spo", "x": 40, "y": 110},
+        {"id": "pa", "label": "Power Automate\napproval flow", "icon": "power_automate", "x": 230, "y": 110},
+        {"id": "rej", "label": "Notify uploader\n(rejected)", "icon": "reject", "x": 40, "y": 210},
+        {"id": "appr", "label": "Approver\n(email / Teams)", "icon": "approver", "x": 230, "y": 210},
+        {"id": "spo2", "label": "SharePoint library\n(approved PDFs)", "icon": "spo", "x": 230, "y": 310},
+        {"id": "sb", "label": "Service Bus queue\n+ dead-letter", "icon": "service_bus", "x": 470, "y": 185},
+        {"id": "fn", "label": "Function App / job\nqueue trigger + nightly\nreconcile", "icon": "function_app", "x": 650, "y": 185},
+        {"id": "blob", "label": "Blob Storage\nraw + approved PDFs", "icon": "storage", "x": 820, "y": 95},
+        {"id": "di", "label": "Document Intelligence\nlayout to Markdown", "icon": "doc_intelligence", "x": 820, "y": 185},
+        {"id": "emb", "label": "Azure OpenAI\nembedding model", "icon": "openai", "x": 820, "y": 270},
+        {"id": "search", "label": "Azure AI Search\nchunks + vectors + ACL groups", "icon": "ai_search", "x": 1160, "y": 200},
+        {"id": "kv", "label": "Key Vault", "icon": "key_vault", "x": 480, "y": 490},
+        {"id": "ai", "label": "Application Insights", "icon": "app_insights", "x": 680, "y": 490},
+        {"id": "la", "label": "Log Analytics\n(DLQ + failure alerts)", "icon": "log_analytics", "x": 890, "y": 490},
+        {"id": "entra", "label": "Entra ID\nmanaged identities / RBAC", "icon": "entra_id", "x": 1100, "y": 490}
+      ],
+      "edges": [
+        {"from": "spo1", "to": "pa", "label": "file created"},
+        {"from": "pa", "to": "appr", "label": "approval request"},
+        {"from": "appr", "to": "rej", "label": "reject", "color": "#D13438"},
+        {"from": "appr", "to": "spo2", "label": "approve: copy PDF", "color": "#107C10"},
+        {"from": "spo2", "to": "sb", "label": "approved-file event"},
+        {"from": "sb", "to": "fn", "label": "trigger"},
+        {"from": "fn", "to": "blob", "label": "store PDF"},
+        {"from": "fn", "to": "di", "label": "analyze"},
+        {"from": "fn", "to": "emb", "label": "embed chunks"},
+        {"from": "fn", "to": "search", "label": "upsert chunks + ACLs, delete stale versions", "exit": [1, 0.9], "entry": [0, 0.5], "via": [[742, 228], [742, 368], [1050, 368], [1050, 224]]},
+        {"from": "M_az", "to": "M_ops", "label": "managed identity  |  telemetry  |  alerts", "dashed": true}
+      ],
+      "notes": {
+        "x": 20, "y": 620, "w": 1340, "h": 130,
+        "text": "Ingestion rules: event-driven via queue (not a blind cron) | idempotent on (documentId, version, content hash) | retries + dead-letter queue + alert | chunk by headings with overlap, keep title / page / source URL / version on each chunk | store allowed Entra group IDs on every chunk for security trimming | on update or delete, remove old chunks | nightly reconcile compares SharePoint against the index.\nSource files: approved PDFs only; rejected files never reach the pipeline."
+      }
+    }
+  ]
+}
